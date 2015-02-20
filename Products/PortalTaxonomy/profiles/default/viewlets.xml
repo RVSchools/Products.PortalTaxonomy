@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<object>
+  <order manager="plone.abovecontentbody" skinname="*"
+         based-on="Plone Default">
+    <viewlet name="rocky.smartsearch" insert-before="*" />
+  </order>
+</object>

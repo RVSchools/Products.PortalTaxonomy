@@ -1,0 +1,241 @@
+<div tal:define="portal_url context/@@plone_portal_state/portal_url;
+     			     target_url python: '%s/resources' % portal_url;
+                 current_url context/@@plone_context_state/current_base_url"
+     tal:condition="python: target_url==current_url" >
+<div tal:define="use_types_blacklist request/use_types_blacklist | python:True;
+                 use_navigation_root request/use_navigation_root | python:True;
+                 search_path request/search_path|nothing;
+		 	      whole_site python: search_path and True or False;
+                 raw_cats request/categories|python:();
+                 filters request/filters|nothing;
+                 show_tags request/show_tags|nothing;
+                 results python:here.smartQuery(REQUEST=request,use_types_blacklist=use_types_blacklist, use_navigation_root=use_navigation_root);
+                 Batch python:modules['Products.CMFPlone'].Batch;
+                 b_size python:30;b_start python:0;b_start request/b_start | b_start;
+                 desc_length view/desc_length;
+                 desc_ellipsis view/desc_ellipsis;
+                 searchterm request/SearchableText|nothing;
+                 use_view_action view/use_view_action|python:();
+                 plone_view context/@@plone;
+                 putils context/plone_utils">
+    <style type="text/css" media="screen" tal:content="string: @import url($portal_url/category_widget.css);"></style>
+    <script type="text/javascript" src="#" tal:attributes="src string:$portal_url/category_widget.js"></script>
+<form tal:define="form_action python: '%s/resources' % portal_url;"
+      tal:attributes="action form_action"
+      class="enableAutoFocus"
+      name="search2"
+      id="searchform">
+<table id="smart-search">
+  <tr>
+    <td tal:define="search_path request/search_path|nothing;"
+        tal:attributes="width string:50%;
+                        id string:search-pane">
+        <div class="heading">Keyword(s):</div>
+        <span id="smart-help"><a href="where/is/the/help" target="_blank"
+                                 tal:attributes="href string:$portal_url/assets/help-resource-collections;">Need Help?</a></span>
+
+        <div class="discreet">
+            Search Scope: 
+            <input type="radio" name="search_path" id="search_path_1" value="/resources" onclick="setScope()"
+                   tal:attributes="checked python: whole_site and None or 'checked'" /><label for="search_path_1">Resource Collections</label>
+            <input type="radio" name="search_path" id="search_path_2" value="" onclick="setScope(true)"
+                   tal:attributes="checked python: whole_site and 'checked' or None" /><label for="search_path_2">Whole Site</label>
+        </div>
+
+        <div class="field">
+            <input type="text"
+                   id="SearchableText"
+                   name="SearchableText"
+                   size="25"
+                   tal:attributes="value request/SearchableText|nothing"
+                   />
+            <input class="smart-button"
+                   type="submit"
+                   name="submit"
+                   value=""
+                   />
+        </div>
+
+        <div id="search-hidden"
+             tal:attributes="class python: whole_site and None or 'hide_search'"><strong>Please Note</strong>: Filters and Keyword tags are not applicable when searching the whole site.</div>
+
+        <div id="filter-row"
+             tal:attributes="class python: whole_site and 'hide_search' or None">
+            <input type="hidden" name="filters" id="filters" value="" />
+            <div id="smart_filters">
+            <h4>Current Filters:</h4>
+            </div>
+            <div>
+            <h4>Last Filters:</h4>
+                <span tal:condition="raw_cats" 
+                      tal:define="filter_divs python: filters and filters.replace(',', '</div><div>') or ''"
+                      tal:replace="structure python: '<div>%s</div>' % filter_divs"/>
+            </div>
+        </div>
+        <!-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+        <fieldset id="search_set"
+                  tal:attributes="class python: whole_site and 'hide_search' or None">
+            <legend>
+                <input class="smart-button"
+                       type="submit"
+                       name="submit"
+                       value=""
+                       />
+                <span>Refine/Browse</span> by topics below.
+                <br /><input type="checkbox" value="True" name="show_tags" id="show_tags" 
+                             tal:attributes="checked python: show_tags and 'checked' or None;" /> <label for="show_tags">Show Keyword tags in results?</label>
+            </legend>
+                <tal:block tal:define="vocab here/getVocab;
+                                       fieldName string:categories">
+                      <input type="hidden"
+                         value=""
+                         tal:condition="not:field/required|nothing"
+                         tal:attributes="name string:$fieldName:default:list;" />
+
+                          <div id="#" class="finderParent" style="overflow: auto;"
+                               tal:attributes="id string:finderParent_${fieldName};">
+                        <ul id="#" class="categorySelector"
+                                tal:attributes="id string:finder_${fieldName}">
+                              <tal:loop condition="exists: python:vocab[0]"
+                                        repeat="category python:vocab[0]">
+                                <metal:use use-macro="here/category_widget2/macros/category">Category</metal:use>
+                              </tal:loop>
+                            </ul>
+                          </div>
+                    <tal:condition condition="exists: python:vocab[1]">
+                        <div style="display:none;">
+                      <select tal:attributes="name string:${fieldName}:list;
+                                          id string:selected_categories_${fieldName};"
+                                  multiple="multiple" size="6">
+                          </select>
+                          <br/>
+                          <input type="button" name="remove" value="remove"
+                                 tal:attributes="onclick string:removeSelectedOptions(this.form.selected_categories_${fieldName}, '_${fieldName}');"
+                          />
+                        </div>
+                    </tal:condition>
+                    <input type="hidden" id="items" name="items" value="<?=$items?>"
+                               tal:attributes="id string:items_${fieldName};
+                                               name string:items_${fieldName};"/>
+                        </tal:block>
+
+                <!-- +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ -->
+        </fieldset>
+    </td><td id="results-pane">
+
+    <div class="heading">
+        <span i18n:translate="heading_search_results">
+            Search results
+        </span>
+        <span class="discreet">
+        &mdash;
+        <span i18n:translate="batch_x_items_matching_your_criteria"
+        ><span i18n:name="number"
+        tal:omit-tag=""
+        tal:content="python:len(results)">234</span> items match your search</span>
+        </span>
+    </div>
+
+    <div tal:condition="not: results">
+        <h3 i18n:translate="description_no_results_found">No results were found.</h3>
+    </div>
+    <div tal:condition="results"
+         tal:define="batch python:Batch(results, b_size, int(b_start), orphan=1);">
+
+        <dl class="searchResults">
+        <tal:results repeat="result batch">
+        <tal:entry define="result_url result/getURL;
+                           result_type result/portal_type;
+                           item_icon python:plone_view.getIcon(result);
+                           url python:'%s?searchterm=%s'%(test(result_type in use_view_action, result_url+'/view', result_url+'/'), searchterm);">
+            <dt tal:define="item_wf_state_class string:state-${result/review_state};"
+                tal:attributes="class python:'contenttype-' + putils.normalizeString(result.portal_type)">
+              <img tal:replace="structure item_icon/html_tag" />
+               <a
+                 href="#"
+                 tal:attributes="href url;
+                                 class string:$item_wf_state_class;
+                                 target string:_blank"
+                 tal:content="result/pretty_title_or_id" />
+            </dt>
+
+            <dd>
+                <!--span tal:replace="python:plone_view.cropText(result.Description, desc_length, desc_ellipsis)"-->
+                <span tal:replace="python: result.Description">
+                    Cropped description
+                </span>
+
+            <span class="documentByLine">
+                <span class="documentAuthor"
+                    i18n:translate="label_by_author">
+                by
+                <a href="#"
+                   tal:attributes="href string:${context/@@plone_portal_state/navigation_root_url}/author/${result/Creator}"
+                   tal:content="result/Creator"
+                   tal:omit-tag="not:result/Creator"
+                   i18n:name="author">
+                Bob Dobalina
+                </a>
+
+                </span>
+
+                <span class="documentModified">
+                  &mdash;
+                    <span i18n:translate="box_last_modified">
+                    last modified
+                    </span>
+                    <span tal:replace="python:putils.toLocalizedTime(result.ModificationDate, long_format=1)">
+                    August 16, 2001 at 23:35:59
+                    </span>
+                </span>
+
+                <tal:show_tags tal:condition="show_tags"
+                               tal:define="categories result/getCategoryNames|nothing">
+                    &mdash;
+                <span tal:condition="categories">
+                    <tal:filedunder i18n:translate="label_filed_under">filed under:</tal:filedunder>
+                        <span tal:repeat="category categories">
+                            <a href=""
+                               class="link-category"
+                               rel="tag"
+                               tal:content="python: category[0]"
+                               tal:define="search_val python: category[1]"
+                               tal:attributes="href string:${context/@@plone_portal_state/navigation_root_url}/search?getCategories%3Alist=${search_val};
+                                               target string:_blank">
+                               Category
+                            </a><tal:separator condition="not: repeat/category/end">,</tal:separator>
+                        </span>
+                </span>
+                <span tal:condition="not: categories">NO KEYWORD TAGS</span>
+                </tal:show_tags>
+
+                <span class="relevance"
+                      tal:condition="result/data_record_normalized_score_">
+                    &mdash;
+                    <tal:relevance i18n:translate="label_relevance_percentage">
+                    Relevance:
+                        <span tal:content="result/data_record_normalized_score_"
+                               tal:omit-tag=""
+                               i18n:name="percentage">23</span>%
+                    </tal:relevance>
+                </span>
+            </span>
+
+            </dd>
+
+        </tal:entry>
+        </tal:results>
+        </dl>
+
+        <div metal:use-macro="here/batch_macros/macros/navigation" />
+
+    </div>
+
+    </td>
+  </tr>
+</table>
+    
+</form>
+
+</div>
+</div>
